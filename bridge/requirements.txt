@@ -1,0 +1,11 @@
+google-cloud-aiplatform==2.7.0
+matplotlib==3.11.2
+numpy==2.5.4
+pandas==3.1.0
+pcst_fast==1.0.10
+pyoxigraph==0.5.13
+rdflib==7.6.0
+sentence-transformers==6.2.0
+torch==2.11.0+cu128
+torch-geometric==2.8.1
+tqdm==4.70.1

@@ -1,0 +1,17 @@
+# local environment / caches
+.venv/
+__pycache__/
+*.pyc
+.claude/
+
+# run outputs (logs, prompts, checkpoints, cloud scripts)
+runs/
+
+# agent instruction prompts
+prompts/
+
+# third-party papers and datasets (licensing)
+relevantWorks/
+graphsWorks/
+data/*
+!data/splits/
