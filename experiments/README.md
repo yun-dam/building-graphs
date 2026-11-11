@@ -48,6 +48,44 @@ The full tables with all metrics and all strata are in [results/retriever_eval_s
 5. **223P transfer is still open.** BRIDGE trails text-kNN on node R@10 for the 223P buildings. The question-agnostic encoders lose about half their performance there.
 6. **Answer F1 is the noisiest metric** (MLP: ±0.13), so small F1 differences should not be read as real.
 
+## Results by question bucket
+
+`eval_buckets.py` tags each test question five ways:
+
+- SPARQL pattern
+- gold path hops
+- answer-set size
+- paraphrase source
+- stratum
+
+It then reports per-bucket metrics as the mean over 3 seeds. Text-kNN appears as a single number because it has no training. Below, "best baseline" means the best of the four GNN/MLP baselines and text-kNN.
+
+The full tables are in [results/bucket_eval.md](results/bucket_eval.md). The per-question rows, for re-slicing, are in `results/bucket_rows.jsonl.gz`.
+
+| bucket | n | BRIDGE edge R@50 | best baseline | Δ | BRIDGE Hit@1 | best baseline | Δ |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| hops = 1 | 3020 | 0.859 | 0.624 (kNN) | **+0.235** | 0.804 | 0.763 (CompGCN-2) | +0.041 |
+| hops = 2 | 1435 | 0.825 | 0.593 (GCN) | **+0.232** | 0.697 | 0.730 (CompGCN-2) | −0.033 |
+| hops = 3+ | 305 | 0.850 | 0.760 (CompGCN-6) | +0.091 | 0.674 | 0.707 (CompGCN-2) | −0.033 |
+| answers 11–100 | 2685 | 0.854 | 0.484 (GCN) | **+0.370** | 0.832 | 0.847 (CompGCN-2) | −0.015 |
+| answers >100 | 1160 | 0.610 | 0.511 (kNN) | +0.099 | 0.530 | 0.440 (CompGCN-6) | **+0.090** |
+| linear | 3785 | 0.867 | 0.580 (kNN) | **+0.287** | 0.802 | 0.785 | +0.017 |
+| branching | 705 | 0.839 | 0.645 (GCN) | +0.194 | 0.619 | 0.657 | −0.038 |
+| filtered / aggregation / optional | 140 / 200 / 70 | 0.29 / 0.64 / 0.56 | kNN ties or wins | ≈0 / +0.03 / −0.11 | | | |
+| stratum s223 | 1310 | 0.496 | 0.413 (kNN) | +0.083 | 0.468 | 0.340 (kNN) | **+0.128** |
+| stratum mortar-brick | 1210 | 0.955 | 0.754 (kNN) | +0.200 | 0.787 | 0.893 (CompGCN-2) | **−0.106** |
+
+**What the buckets show**
+
+1. **The edge-recall gap does not grow with hops; it shrinks.** It is +0.23 at 1 and 2 hops but +0.09 at 3+ hops. The gap is largest for mid-sized answer sets (11–100) and for linear patterns. The hypothesis that "conditioning helps most on multi-hop questions" is not what the data shows.
+2. **On top-1 path ranking, the 2-layer CompGCN beats BRIDGE on multi-hop questions** (2 and 3+ hops, branching patterns) and on the mortar-brick stratum (−0.11). BRIDGE wins Hit@1 on large answer sets (>100) and on 223P (+0.13).
+3. **On SPARQL modifiers, text-kNN is as good as or better than every learned model on node recall.** This covers the filtered, aggregation, union and optional patterns, about 10% of questions. Filtered questions are hard for every learned model: edge R@50 is 0.29 at best. These buckets have 70–200 questions each, so treat them as directional.
+4. **All models are robust across paraphrase sources.** LLM_5_v3 is the hardest source for every model, and BRIDGE drops the most there (edge R@50 0.80 vs 0.84 for the other sources).
+
+**Caveat on the edge comparison.** The shared edge head scores an edge from `[h_s, w_r, h_t]`. In BRIDGE those states depend on the question. In the encode-then-match baselines they do not, so a baseline's edge scores depend on the question only through which nodes enter the top-64 candidate region. This shows up as baseline edge R@50 being constant across paraphrase sources (0.469–0.470).
+
+The edge gap therefore measures "conditioning in the encoder vs no question in the edge head". A fairer baseline would feed `q` into the edge MLP. Until that runs, read the edge-recall gap as an upper bound on the effect of encoder conditioning. Node recall and path Hit@1 are not affected, because those heads already see `q`.
+
 ## Reproduce
 
 Run these from the repo root after the `bridge` data pipeline (`labels`, `graph_build`, `data`):
@@ -69,6 +107,8 @@ python -m experiments.aggregate_seeds runs/exp/retriever_eval_baselines.json run
 | `encoders.py` | CompGCN / GCN / MLP encoders with BRIDGE's heads |
 | `train_baseline.py`, `eval_baseline.py` | training and evaluation, mirroring `bridge.train` / `bridge.eval_retriever` |
 | `aggregate_seeds.py`, `seed_chain.sh` | mean ± std over seeds; the per-seed run |
+| `eval_buckets.py` | per-question-bucket evaluation (`--from-rows` re-aggregates without rerunning models) |
+| `results/bucket_eval.{json,md}`, `results/bucket_rows.jsonl.gz` | bucket results; per-question rows |
 | `results/retriever_eval_s{0,1,2}.json` | per-seed, per-stratum test metrics |
 | `results/retriever_eval_seeds.{json,md}` | aggregated results |
 | `results/retriever_eval_v1_repro_with_knn_pcst.json` | BRIDGE seed 0 plus the text-kNN and PCST baselines (from `bridge.eval_retriever`) |
